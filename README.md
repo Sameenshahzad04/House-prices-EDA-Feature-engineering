@@ -1,79 +1,166 @@
-# 🏡 Ames Housing: Reasoning-First EDA & Domain Feature Engineering
+# 🏡 Ames Housing Price Prediction & Feature Engineering Pipeline
 
-An end-to-end Machine Learning pipeline built on the **Ames Housing Dataset**. This project focuses on **deep domain reasoning** behind data transformations—explaining the explicit *why* for every decision, from target distribution scaling to model-specific preprocessing (Linear Regression vs. XGBoost / Random Forest).
-
----
-
-## 📌 Project Overview & Deliverables
-
-Rather than blindly throwing automated transformations or one-hot encoding at the dataset, this project systematically breaks down all **80 features** into a domain-driven pipeline:
-
-1. **Target Analysis:** Analyzing $Y$ skewness/kurtosis and stabilizing variance via log-transformation ($\log(1+x)$).
-2. **Structural Missingness vs. Unobserved Data:** Treating missing values based on architectural/domain rules (e.g., `PoolQC = NaN` means *No Pool*, not missing data).
-3. **Domain Feature Engineering:** Consolidating sparse categoricals and constructing composite physical metrics (Total SF, Quality-Area interactions, House Age).
-4. **Model-Aware Pipeline Design:** Understanding why monotonic transformations and feature scaling are critical for Linear models but invariant for Tree-based models.
+An end-to-end data science and feature engineering pipeline on the Ames Housing Dataset. This project systematically transforms raw tabular housing data (1,460 rows $\times$ 81 features) into a high-signal 144-column numerical feature matrix optimized for tree-based ensemble models.
 
 ---
 
-## 💡 What Makes This Solution Unique?
+## 📁 Repository Structure
 
-### 1. Dual Preprocessing Paths (Linear vs. Tree Models)
-* **For Linear Models (Ridge/Lasso):** Skewed features are log-transformed ($\log(1+x)$) to fix heteroscedasticity, high-cardinality features are One-Hot Encoded, and values are scaled with `RobustScaler` to limit outlier impact.
-* **For Tree Models (XGBoost & Random Forest):** Input feature skewness and scale transformations are bypassed because tree splits rely strictly on feature ranking ($X_j \le t$). However, **Target ($Y$) Transformation** is retained to prevent extreme luxury mansions from corrupting mean-squared error (MSE) leaf calculations.
+```text
+.
+├── 📄 data/
+│   ├── train.csv                      # Raw Ames Housing dataset (1,460 rows × 81 cols)
+│   ├── train_processed_phase5.csv     # Output post-feature engineering
+│   ├── train_processed_phase6.csv     # Output post-categorical encoding (144 cols)
+│   └── train_processed_phase8.csv     # Final processed dataset for modeling
+├── 📓 notebooks/
+│   ├── EDA_phase3.ipynb               # Target analysis, missingness & univariate EDA
+│   ├── EDA_phase_4_Multivariant.ipynb # Bivariate EDA & multicollinearity reduction
+│   ├── FE_phase_5.ipynb               # Footprint aggregation & age engineering
+│   ├── ECF_phase_6.ipynb              # Ordinal mapping, bit-encoding & dummy creation
+│   └── phase7_phase8.ipynb            # Log transforms, feature selection & RF baseline
+└── 📄 README.md                          # Repository documentation
 
-### 2. Domain Feature Consolidation over Blind One-Hot Encoding
-To prevent high-cardinality overfitting and sparse feature matrices, raw categories were engineered into dense, high-signal flags:
-* **Overlapping Transaction Context:** Merged `SaleType` + `SaleCondition` into explicit financial flags: `Is_New_Construction`, `Is_Distressed_Sale`, and `Is_Normal_Sale`.
-* **Structural Layout Extraction:** Deconstructed `HouseStyle` into a continuous `HouseStyle_Stories` metric and a binary `Is_Split_Layout` flag.
-* **Heavy Dominance Filtering:** Replaced highly skewed categoricals (>98% single class like `RoofMatl` and `Heating`) with single binary indicator flags.
-
-### 3. Derived Interaction Features
-* **Total Living Space:** $\text{TotalSF} = \text{TotalBsmtSF} + \text{1stFlrSF} + \text{2ndFlrSF}$
-* **Composite Bathrooms:** $\text{TotalBath} = \text{FullBath} + 0.5(\text{HalfBath}) + \text{BsmtFullBath} + 0.5(\text{BsmtHalfBath})$
-* **Domain Interaction (Invented):** $\text{OverallQual\_x\_TotalSF} = \text{OverallQual} \times \text{TotalSF}$ (captures price scaling per square foot relative to material finish quality).
-
----
-
-## 📊 Pipeline Phases
-
-The project is structured in a single Jupyter Notebook across **9 distinct phases**:
-
-| Phase | Description | Key Outputs |
-| :--- | :--- | :--- |
-| **Phase 0** | Setup & Manual Column Classification | Classified all 80 features into Continuous, Discrete, Ordinal, Nominal, and Target. |
-| **Phase 1** | Target Variable Analysis | Analyzed `SalePrice` skewness (1.88) & kurtosis (6.53); applied $\log(1+p)$ transform. |
-| **Phase 2** | Missing Data Decision Matrix | Differentiated structural missingness (`None`/`0`) from random nulls (Median/Mode). |
-| **Phase 3** | Univariate EDA & Outliers | Flagged continuous skewness, identified rare categorical levels (<1%), evaluated IQR outliers. |
-| **Phase 4** | Multivariate EDA & Collinearities | Identfied top price drivers (`OverallQual`, `GrLivArea`, `TotalBsmtSF`) and collinear pairs. |
-| **Phase 5** | Derived Feature Engineering | Engineered `TotalSF`, `HouseAge`, `TotalBathrooms`, and `OverallQual_x_TotalSF`. |
-| **Phase 6** | Ordinal & Nominal Encoding | Mapped ordinal qualities (`Ex` $\rightarrow$ 5, `Po` $\rightarrow$ 1); bucketed low-frequency nominals into "Other". |
-| **Phase 7** | Scaling & Model Differentiation | Compared `StandardScaler` vs. `RobustScaler`; documented Linear vs. Tree-model requirements. |
-| **Phase 8** | Feature Selection & Validation | Removed redundant pairs; computed baseline `RandomForestRegressor` feature importances. |
+```
 
 ---
 
-## 📝 Key Findings & Executive Summary
+## ⚡ Pipeline Architecture & Phase Summary
 
-### Top 3 EDA Findings
-1. **Target Distribution is Right-Skewed:** `SalePrice` had a right skewness of **1.88** and excess kurtosis of **6.53**. Applying `log1p` pulled skewness down to **0.12**, yielding a near-normal distribution.
-2. **Missingness is Structural, Not Random:** Over 90% of missing values in columns like `PoolQC`, `MiscFeature`, `Alley`, `Fence`, and `GarageType` represent the **absence of a feature** rather than missing data. Treating them as `None` or `0` preserved critical physical context.
-3. **Severe Multicollinearity in Area/Garage Features:** `GarageCars` vs. `GarageArea` ($r = 0.88$) and `TotalBsmtSF` vs. `1stFlrSF` ($r = 0.81$) were highly collinear.
+### 🎯 Phase 0 & 1: Data Understanding & Target Normalization
 
-### Top 3 Engineered Features
-1. **`TotalSF`:** Higher correlation with `SalePrice` ($r \approx 0.78$) than any single raw area feature.
-2. **`OverallQual_x_TotalSF`:** Ranked among the top 3 features in Random Forest feature importance, effectively modeling price elasticity.
-3. **`HouseAge` ($\text{YrSold} - \text{YearBuilt}$):** Provided a linear decay signal far stronger than raw construction year inputs.
+* **Data Classification:** Categorized all 81 raw features into continuous, discrete, ordinal, and nominal types to prevent silent downstream errors (e.g., mistaking structural `NA` for missing data).
+
+
+* **Target Transformation:** Identified severe right skewness in `SalePrice` (skewness = 1.881, kurtosis = 6.510). Applied $\text{log1p}$ transformation to yield `SalePrice_Log` (skewness = 0.121, kurtosis = 0.803), stabilizing residual loss functions.
+
+
+
+### 🔍 Phase 2: Missing Data Diagnostics
+
+* **Structural Imputation (`NA` = Feature Absent):** Filled categorical structural nulls with `"None"` (`PoolQC`, `MiscFeature`, `Alley`, `Fence`, `FireplaceQu`, `Garage*`, `Bsmt*`) and numerical structural nulls with `0` (`MasVnrArea`).
+
+
+* **MCAR Imputation:** Applied median imputation to `LotFrontage` (17.74% missing) and modal imputation to `Electrical`.
+
+
+
+| Feature | Missing % | Classification | Imputation Strategy |
+| --- | --- | --- | --- |
+| **`PoolQC`** | 99.52%
+
+ | Structural | Constant `"None"`<br> |
+| **`MiscFeature`** | 96.30%
+
+ | Structural | Constant `"None"`<br> |
+| **`Alley`** | 93.77%
+
+ | Structural | Constant `"None"`<br> |
+| **`Fence`** | 80.75%
+
+ | Structural | Constant `"None"`<br> |
+| **`LotFrontage`** | 17.74%
+
+ | Random (MCAR) | Median Imputation
+
+ |
+
+### 🧹 Phase 3 & 4: Anomaly Trimming & Multicollinearity
+
+* **Outlier Handling:** Removed 4 data-entry anomalies in `GrLivArea` (> 4,000 sq ft selling at abnormally low prices). Capped extreme tails in `GarageArea` (938.25 sq ft) and `TotalBsmtSF` (2,052 sq ft) at their $1.5 \times \text{IQR}$ upper bounds. Dataset updated to 1,456 rows $\times$ 79 columns.
+
+
+* **Collinearity Resolution ($\vert{}r\vert{} > 0.80$):** Retained higher $y$-correlated feature per redundant pair:
+
+
+* Kept **`GarageCars`** over `GarageArea` ($r = 0.893$)
+
+
+* Kept **`GrLivArea`** over `TotRmsAbvGrd` ($r = 0.834$)
+
+
+* Kept **`YearBuilt`** over `GarageYrBlt` ($r = 0.825$)
+
+
+
+
+
+### 🧬 Phase 5 & 6: Domain Feature Engineering & Categorical Encoding
+
+* **Total Effective Footprint:** Created aggregate feature `Total EffectiveSF` = `GrLivArea` + `TotalBsmtSF` + `WoodDeckSF` + `OpenPorchSF` + `EnclosedPorch` + `3SsnPorch` + `ScreenPorch`, increasing target correlation from 0.7205 to 0.8199.
+
+
+* **Temporal Dynamics:** Derived `HouseAge` ($\text{YrSold} - \text{YearBuilt}$), `RemodAge` ($\text{YrSold} - \text{YearRemodAdd}$), and `IsRemodeled` flag before dropping raw calendar years.
+
+
+* **Proximity Flags:** Parsed `Condition1` and `Condition2` into targeted binary flags (`Has_Pos_Amenity`, `Has_Traffic_Disturbance`, `Has_Railroad_Disturbance`) to preserve economic directionality.
+
+
+* **Encoding Matrix:**
+* **Explicit Ordinal Mapping:** Mapped 11 quality/condition features on integer scales (0–5).
+
+
+* **Neighborhood Bit-Encoding:** Compressed 25 high-cardinality neighborhood categories into 5 bit columns (`Nbhd_bit0`–`Nbhd_bit4`).
+
+
+* **One-Hot Encoding:** Applied dummy encoding (`drop_first=True`) to remaining low-cardinality nominals, yielding 144 columns.
+
+
+
+
+
+### 🌲 Phase 7 & 8: Transformations & Baseline Modeling
+
+* Applied $\text{log1p}$ transformations to skewed predictors (`LotArea_log`, `LotFrontage_log`). Bypassed scaling steps to maintain raw split boundaries for decision trees.
+
+
 
 ---
-🚀 How to Run Locally
-1. Clone the repository
-Bash
-git clone [https://github.com/YOUR_USERNAME/house-prices-eda-feature-engineering.git](https://github.com/YOUR_USERNAME/house-prices-eda-feature-engineering.git)
-cd house-prices-eda-feature-engineering
-2. Set up virtual environment
-Bash
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
-3. Install dependencies
-Bash
-pip install -r requirements.txt
+
+## 📈 Baseline Model Performance
+
+Evaluated using a baseline `RandomForestRegressor` on the original dollar scale via `np.expm1()`:
+
+| Metric | Score |
+| --- | --- |
+| **Training RMSE** | **$18,800.66**<br> |
+| **Validation RMSE** | **$23,517.16**<br> |
+| **Overfitting Gap** | **~$4,717.00**<br> |
+
+### 🏆 Top Feature Importances
+
+```text
+Total EffectiveSF  ████████████████████████████████████ 45.32%[cite: 7]
+Overall Qual       ███████████████████████████ 36.91%[cite: 7]
+HouseAge           █ 2.41%[cite: 7]
+GarageCars         █ 1.49%[cite: 7]
+GrLivArea          █ 1.39%[cite: 7]
+
+```
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/your-username/house-prices-eda-fe.git
+cd house-prices-eda-fe
+
+# 2. Set up virtual environment with uv
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# 3. Install required packages
+pip install pandas numpy scikit-learn matplotlib seaborn
+
+```
+
+---
+
+## 💡 Key Lessons Learned
+
+* **Domain-First Imputation:** Filling missing values based on data dictionaries (structural vs. random missingness) prevents fake feature creation.
+
+
+* **Tree-Focused Preprocessing:** Skipping global normalization and relying on rank-preserving ordinal transformations maintains model interpretability without sacrificing tree performance.
