@@ -2,6 +2,8 @@
 
 An end-to-end data science and feature engineering pipeline on the Ames Housing Dataset. This project systematically transforms raw tabular housing data (1,460 rows $\times$ 81 features) into a high-signal 144-column numerical feature matrix optimized for tree-based ensemble models.
 
+* note: Always understand the feature meaning in data, understand it type like nomial,ordinal,numeric discrete and numeric continous
+
 ---
 
 ## 📁 Repository Structure
@@ -47,23 +49,11 @@ An end-to-end data science and feature engineering pipeline on the Ames Housing 
 
 | Feature | Missing % | Classification | Imputation Strategy |
 | --- | --- | --- | --- |
-| **`PoolQC`** | 99.52%
-
- | Structural | Constant `"None"`<br> |
-| **`MiscFeature`** | 96.30%
-
- | Structural | Constant `"None"`<br> |
-| **`Alley`** | 93.77%
-
- | Structural | Constant `"None"`<br> |
-| **`Fence`** | 80.75%
-
- | Structural | Constant `"None"`<br> |
-| **`LotFrontage`** | 17.74%
-
- | Random (MCAR) | Median Imputation
-
- |
+| **`PoolQC`** | 99.52%| Structural(showing absence of pool) | Constant `"None"`<br> |
+| **`MiscFeature`** | 96.30% | Structural | Constant `"None"`<br> |
+| **`Alley`** | 93.77% | Structural | Constant `"None"`<br> |
+| **`Fence`** | 80.75% | Structural | Constant `"None"`<br> |
+| **`LotFrontage`** | 17.74% | Random (MCAR) | Median Imputation |
 
 ### 🧹 Phase 3 & 4: Anomaly Trimming & Multicollinearity
 
@@ -164,3 +154,7 @@ pip install pandas numpy scikit-learn matplotlib seaborn
 
 
 * **Tree-Focused Preprocessing:** Skipping global normalization and relying on rank-preserving ordinal transformations maintains model interpretability without sacrificing tree performance.
+* note: Always understand the feature meaning in data, understand it type like nomial,ordinal,numeric discrete and numeric continous
+comments:
+It is very interesting problem to learning model training and EDA, hoping that this repo helps you to enjoy hihi
+
